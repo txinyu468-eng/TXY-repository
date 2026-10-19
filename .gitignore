@@ -1,0 +1,14 @@
+# 与本扩展无关的其他项目
+web-summarizer/
+
+# 依赖与虚拟环境
+node_modules/
+.venv/
+__pycache__/
+
+# 系统与编辑器
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/
