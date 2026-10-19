@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>结果页预览（开发用）</title>
+    <link rel="stylesheet" href="../src/result/result.css" />
+    <style>
+      .dev-banner {
+        padding: 8px 32px;
+        background: #fff4e5;
+        color: #8a4b00;
+        font: 12px/1.6 "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        .dev-banner {
+          background: #3a2a12;
+          color: #ffd9a6;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="dev-banner">
+      开发预览页：数据是假的，仅用于检查界面。真实扩展请加载项目根目录后到商品详情页使用。
+    </div>
+
+    <header class="topbar">
+      <div class="topbar__info">
+        <div class="topbar__line">
+          <h1 id="pageTitle">正在读取任务…</h1>
+          <span class="badge" id="siteBadge" hidden></span>
+        </div>
+        <a class="topbar__url" id="pageUrl" href="#" target="_blank" rel="noreferrer noopener"></a>
+      </div>
+      <div class="toolbar">
+        <button class="btn btn--ghost" id="btnSelectAll" type="button">全选</button>
+        <button class="btn btn--ghost" id="btnInvert" type="button">反选</button>
+        <button class="btn btn--ghost" id="btnClear" type="button">清空</button>
+      </div>
+    </header>
+
+    <nav class="filters" id="filters" aria-label="按分类筛选">
+      <button class="chip is-active" data-filter="all" type="button">
+        全部<span class="chip__count" data-count="all">0</span>
+      </button>
+      <button class="chip" data-filter="main" type="button">
+        主图<span class="chip__count" data-count="main">0</span>
+      </button>
+      <button class="chip" data-filter="detail" type="button">
+        详情图<span class="chip__count" data-count="detail">0</span>
+      </button>
+      <button class="chip" data-filter="other" type="button">
+        其他<span class="chip__count" data-count="other">0</span>
+      </button>
+    </nav>
+
+    <main class="grid" id="grid"></main>
+
+    <section class="empty" id="empty" hidden>
+      <p class="empty__title">没有可显示的图片</p>
+      <p class="empty__desc" id="emptyDesc"></p>
+    </section>
+
+    <footer class="dock" id="dock" hidden>
+      <div class="dock__info">
+        已选 <b id="selectedCount">0</b> 张
+        <span class="dock__total">／ 共 <b id="totalCount">0</b> 张</span>
+      </div>
+      <button class="btn btn--ghost" id="btnRetry" type="button" hidden>重试失败</button>
+      <button class="btn btn--primary" id="btnDownload" type="button" disabled>下载 PNG</button>
+    </footer>
+
+    <div class="lightbox" id="lightbox" hidden>
+      <button class="lb__close" id="lbClose" type="button" aria-label="关闭预览">×</button>
+      <button class="lb__nav lb__prev" id="lbPrev" type="button" aria-label="上一张">‹</button>
+      <figure class="lb__stage">
+        <img id="lbImage" alt="预览图" />
+        <figcaption id="lbCaption"></figcaption>
+      </figure>
+      <button class="lb__nav lb__next" id="lbNext" type="button" aria-label="下一张">›</button>
+      <div class="lb__actions">
+        <button class="btn btn--primary" id="lbDownload" type="button">下载这张 PNG</button>
+      </div>
+    </div>
+
+    <div class="progress" id="progress" hidden>
+      <div class="progress__card">
+        <p class="progress__title">正在转换为 PNG 并下载…</p>
+        <div class="progress__bar"><i id="progressFill"></i></div>
+        <p class="progress__meta" id="progressMeta">0 / 0</p>
+        <button class="btn btn--ghost" id="btnCancel" type="button">取消</button>
+      </div>
+    </div>
+
+    <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+    <script>
+      // ---- 用假数据模拟 chrome API，方便在没有安装扩展时预览界面 ----
+      (function () {
+        const make = (seed, width, height, category, index) => ({
+          id: `img_${index}`,
+          url: `https://picsum.photos/seed/${seed}/${width}/${height}`,
+          thumb: `https://picsum.photos/seed/${seed}/${width}/${height}`,
+          width,
+          height,
+          category,
+          order: index,
+        });
+
+        const images = [];
+        for (let i = 1; i <= 6; i += 1) images.push(make(`emi${i}`, 900, 900, 'main', i));
+        for (let i = 7; i <= 9; i += 1) images.push(make(`emi${i}`, 900, 900, 'detail', i));
+        for (let i = 10; i <= 11; i += 1) images.push(make(`emi${i}`, 900, 900, 'other', i));
+        for (let i = 0; i < 3; i += 1) images.push(make(`tall${i}`, 800, 2400, 'detail', 20 + i));
+
+        const job = {
+          id: 'demo',
+          siteId: 'taobao',
+          siteName: '淘宝 / 天猫',
+          pageUrl: 'https://item.taobao.com/item.htm?id=123456789',
+          pageTitle: '2026 新款女士针织开衫 慵懒风宽松外搭毛衣',
+          createdAt: Date.now(),
+          images,
+        };
+
+        window.chrome = window.chrome || {};
+        chrome.storage = { session: { get: async (key) => ({ [key]: job }) } };
+        chrome.runtime = { lastError: null };
+        chrome.downloads = {
+          download(_options, callback) {
+            if (callback) callback(1);
+          },
+          onChanged: { addListener() {}, removeListener() {} },
+        };
+      })();
+    </script>
+    <script src="../src/shared/core.js"></script>
+    <script src="../src/result/result.js"></script>
+  </body>
+</html>

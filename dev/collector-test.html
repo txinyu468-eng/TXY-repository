@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>提取引擎自测（开发用）</title>
+    <style>
+      body {
+        font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+        padding: 20px 24px;
+      }
+      pre {
+        font-size: 13px;
+        line-height: 1.7;
+      }
+      .hidden-fixture {
+        position: absolute;
+        left: -9999px;
+        top: 0;
+        width: 400px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 style="font-size: 0">测试商品标题</h1>
+
+    <div class="hidden-fixture">
+      <!-- 1. 带尺寸后缀的主图 -->
+      <img src="https://img.alicdn.com/imgextra/i1/O1CN01A_!!0-item_pic.jpg_430x430q90.jpg" width="400" height="400" />
+
+      <!-- 2. 与 1 是同一张图，应被去重合并 -->
+      <img src="https://img.alicdn.com/imgextra/i1/O1CN01A_!!0-item_pic.jpg" width="400" height="400" />
+
+      <!-- 3. srcset 应取最大尺寸 -->
+      <img
+        src="https://img.alicdn.com/imgextra/i2/B.jpg_200x200.jpg"
+        srcset="https://img.alicdn.com/imgextra/i2/B.jpg_200x200.jpg 200w, https://img.alicdn.com/imgextra/i2/B.jpg_800x800.jpg 800w"
+        width="300"
+        height="300"
+      />
+
+      <!-- 4. 懒加载 data-src -->
+      <img
+        data-src="//img.alicdn.com/imgextra/i3/C.jpg_50x50.jpg"
+        src="data:image/gif;base64,R0lGODlhAQABAAAAACw="
+        width="500"
+        height="500"
+      />
+
+      <!-- 5. 背景图（详情长图） -->
+      <div
+        style="width: 750px; height: 1600px; background-image: url('https://img.alicdn.com/imgextra/i4/D.jpg_800x800.jpg')"
+      ></div>
+
+      <!-- 6. 静态资源目录，属于噪音 -->
+      <img src="https://img.alicdn.com/tps/i1/TB1logo.png" width="400" height="400" />
+
+      <!-- 7. 尺寸过小的图标 -->
+      <img src="https://img.alicdn.com/imgextra/i5/icon-small.png" width="60" height="60" />
+
+      <!-- 8. base64 内联图 -->
+      <img
+        src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+        width="400"
+        height="400"
+      />
+
+      <!-- 9. SVG 应被跳过 -->
+      <img src="https://img.alicdn.com/imgextra/sprite.svg" width="400" height="400" />
+    </div>
+
+    <pre id="output">运行中…</pre>
+
+    <script src="../src/shared/core.js"></script>
+    <script src="../src/shared/dom.js"></script>
+    <script src="../src/adapters/generic.js"></script>
+    <script src="../src/adapters/taobao.js"></script>
+    <script src="../src/adapters/jd.js"></script>
+    <script src="../src/adapters/pinduoduo.js"></script>
+    <script src="../src/content/collector.js"></script>
+    <script>
+      (async () => {
+        const results = [];
+        const assert = (label, actual, expected) => {
+          results.push({ label, ok: actual === expected, actual, expected });
+        };
+
+        try {
+          // 本地页面没有商品站点域名，这里强制使用淘宝适配器
+          EMI.collector.getAdapter = () => EMI.adapters.list.find((item) => item.id === 'taobao');
+
+          const job = await EMI.collector.collect();
+          const urls = job.images.map((image) => image.url);
+
+          assert('去重后共 4 张', job.images.length, 4);
+          assert('主图还原原图', urls[0], 'https://img.alicdn.com/imgextra/i1/O1CN01A_!!0-item_pic.jpg');
+          assert('srcset 取最大尺寸', urls.includes('https://img.alicdn.com/imgextra/i2/B.jpg'), true);
+          assert('data-src 懒加载', urls.includes('https://img.alicdn.com/imgextra/i3/C.jpg'), true);
+          assert('背景图被采集', urls.includes('https://img.alicdn.com/imgextra/i4/D.jpg'), true);
+          assert('tps 静态资源被过滤', urls.some((url) => url.includes('/tps/')), false);
+          assert('小图标被过滤', urls.some((url) => url.includes('icon-small')), false);
+          assert('SVG 被跳过', urls.some((url) => url.endsWith('.svg')), false);
+          assert('data URL 被跳过', urls.some((url) => url.startsWith('data:')), false);
+          assert('长图归类为详情图', job.images.find((image) => image.url.includes('i4/D.jpg')).category, 'detail');
+          assert('方图归类为主图', job.images.find((image) => image.url.includes('O1CN01A')).category, 'main');
+        } catch (error) {
+          results.push({ label: `运行异常：${error.message}`, ok: false, actual: error.stack, expected: '' });
+        }
+
+        document.getElementById('output').textContent = results
+          .map(
+            (item) =>
+              `${item.ok ? 'ok  ' : 'FAIL'} ${item.label}${
+                item.ok ? '' : `\n     actual=${JSON.stringify(item.actual)}\n     expected=${JSON.stringify(item.expected)}`
+              }`
+          )
+          .join('\n');
+        window.__TEST_RESULTS__ = results;
+        document.title = results.every((item) => item.ok) ? `全部通过 (${results.length})` : '存在失败用例';
+      })();
+    </script>
+  </body>
+</html>
